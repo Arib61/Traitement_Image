@@ -1,3 +1,4 @@
+
 import torch
 import streamlit as st
 import torchvision.transforms as transforms
@@ -46,7 +47,29 @@ st.markdown("""
         --shadow-soft: 0 8px 32px rgba(31, 38, 135, 0.37);
         --shadow-strong: 0 15px 35px rgba(0, 0, 0, 0.1);
     }
+    body, .main, .block-container {
+        background-color: #121212 !important;
+        color: #e0e0e0 !important;
+    }
 
+    /* Ajuster les éléments de la sidebar */
+    .sidebar .sidebar-content {
+        background-color: #1e1e1e !important;
+        color: #e0e0e0 !important;
+    }
+
+    /* Boutons et inputs */
+    button, input, select, textarea {
+        background-color: #333 !important;
+        color: #eee !important;
+        border-color: #444 !important;
+    }
+
+    /* Liens */
+    a, a:hover, a:focus {
+        color: #80cbc4 !important;
+    }
+            
     /* Reset et base */
     * {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
