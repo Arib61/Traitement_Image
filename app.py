@@ -941,7 +941,7 @@ def main():
         El Bakkali Malak
     </p>
     <p style="margin: 0.5rem 0 0 0; color: #444; font-size: 0.9rem; font-weight: 600;">
-        Encadré par :<br>
+        Encadré par: <br>
         Lachkar Abdelmonaime
     </p>
 </div>
