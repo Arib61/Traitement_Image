@@ -926,16 +926,26 @@ def main():
     
     # Copyright et informations légales
     st.markdown("""
-    <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: rgba(102, 126, 234, 0.05); border-radius: 15px;">
-        <p style="margin: 0; color: #666; font-size: 0.9rem;">
-            © 2025 PneumoScan PRO - Intelligence Artificielle Médicale<br>
-            <strong>Développé avec PyTorch et TorchXRayVision pour améliorer les diagnostics médicaux</strong>
-        </p>
-        <p style="margin: 1rem 0 0 0; color: #888; font-size: 0.8rem;">
-            Technologies : Streamlit • PyTorch • TorchXRayVision • Gemini AI • Plotly
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+<div style="text-align: center; margin-top: 3rem; padding: 2rem; background: rgba(102, 126, 234, 0.05); border-radius: 15px;">
+    <p style="margin: 0; color: #666; font-size: 0.9rem;">
+        © 2025 PneumoScan PRO - Intelligence Artificielle Médicale<br>
+        <strong>Développé avec PyTorch et TorchXRayVision pour améliorer les diagnostics médicaux</strong>
+    </p>
+    <p style="margin: 1rem 0 0 0; color: #888; font-size: 0.8rem;">
+        Technologies : Streamlit • PyTorch • TorchXRayVision • Gemini AI • Plotly
+    </p>
+    <p style="margin: 1.5rem 0 0 0; color: #444; font-size: 0.9rem; font-weight: 600;">
+        Réalisé par :<br>
+        Arib Aymane<br>
+        Abou-EL-Kacem Kenza<br>
+        El Bakkali Malak
+    </p>
+    <p style="margin: 0.5rem 0 0 0; color: #444; font-size: 0.9rem; font-weight: 600;">
+        Encadré par :<br>
+        Lachkar Abdelmonaime
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # ==================== POINT D'ENTRÉE ====================
 if __name__ == "__main__":
