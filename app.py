@@ -905,7 +905,7 @@ def main():
     st.markdown("""
     <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: rgba(102, 126, 234, 0.05); border-radius: 15px;">
         <p style="margin: 0; color: #666; font-size: 0.9rem;">
-            © 2024 PneumoScan PRO - Intelligence Artificielle Médicale<br>
+            © 2025 PneumoScan PRO - Intelligence Artificielle Médicale<br>
             <strong>Développé avec PyTorch et TorchXRayVision pour améliorer les diagnostics médicaux</strong>
         </p>
         <p style="margin: 1rem 0 0 0; color: #888; font-size: 0.8rem;">
