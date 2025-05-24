@@ -992,13 +992,13 @@ def main():
     </p>
     <p style="margin: 1.5rem 0 0 0; color: #444; font-size: 0.9rem; font-weight: 600;">
         Réalisé par :<br>
-        Arib Aymane<br>
-        Abou-EL-Kacem Kenza<br>
-        El Bakkali Malak
+        ARIB Aymane<br>
+        ABOU-EL KASEM Kenza<br>
+        EL BAKALI Malak
     </p>
     <p style="margin: 0.5rem 0 0 0; color: #444; font-size: 0.9rem; font-weight: 600;">
         Encadré par: <br>
-        Lachkar Abdelmonaime
+        LACHKAR Abdelmonaime
     </p>
 </div>
 """, unsafe_allow_html=True)
