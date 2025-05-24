@@ -303,7 +303,7 @@ st.markdown("""
 def load_model():
     """Charge le modèle de détection de pneumonie avec mise en cache."""
     try:
-        model = xrv.models.DenseNet(weights="densenet121-res224-all").eval()
+        model = xrv.models.DenseNet(weights="densenet121-res224-rsna").eval()
         return model
     except Exception as e:
         st.error(f"Erreur lors du chargement du modèle : {str(e)}")
@@ -351,28 +351,49 @@ def process_standard_image(file) -> Optional[Image.Image]:
         return None
 
 def predict_pneumonia(image: Image.Image, model) -> Optional[float]:
-    """Prédit la probabilité de pneumonie à partir d'une image."""
     try:
-        # Transformations pour le modèle
-        transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485], [0.229])
-        ])
+        st.write("✅ Étape : Préparation de l'image")
         
-        # Conversion et prédiction
-        tensor = transform(image).unsqueeze(0)
+        # Étape 1 : Convertir l'image PIL en niveaux de gris, redimensionner
+        img = image.convert("L").resize((224, 224))
+
+        # Étape 2 : Convertir en tableau NumPy float32
+        img_np = np.array(img).astype(np.float32)  # ← Ceci est du NumPy, pas du Tensor
+
+        # Étape 3 : Transformer en Tensor PyTorch
+        img_tensor = torch.from_numpy(img_np).unsqueeze(0).unsqueeze(0)  # Shape: [1, 1, 224, 224]
+        img_tensor = img_tensor.float()  # ← Ceci est la bonne méthode pour convertir en float32
+
+        # Étape 4 : Normalisation par TorchXRayVision
+        img_np_normalized = xrv.datasets.normalize(img_np, maxval=255.0)
+        img_tensor = torch.from_numpy(img_np_normalized).unsqueeze(0).unsqueeze(0).float()
+
+        # Étape 5 : Prédiction
         with torch.no_grad():
-            output = model(tensor)[0]
-        
-        # Extraction de la probabilité de pneumonie
+            output = model(img_tensor)[0]
+
+        # Étape 6 : Extraction de la probabilité
+        if "Pneumonia" not in model.pathologies:
+            st.error("❌ Label 'Pneumonia' non trouvé dans le modèle.")
+            st.write("Labels disponibles :", model.pathologies)
+            return None
+
         pneumonia_idx = model.pathologies.index("Pneumonia")
-        probability = float(torch.sigmoid(output[pneumonia_idx]))
-        
-        return probability
+        raw_score = output[pneumonia_idx].item()
+        probability = torch.sigmoid(torch.tensor(raw_score)).item()
+
+        st.write(f"✅ Probabilité prédite : {raw_score:.4f}")
+
+        return raw_score
+
     except Exception as e:
-        st.error(f"Erreur lors de la prédiction : {str(e)}")
+        st.error(f"❌ Erreur prédiction : {str(e)}")
         return None
+
+
+
+
+
 
 def generate_ai_report(probability: float, patient_info: dict = None) -> str:
     """Génère un rapport médical avec Gemini AI."""
@@ -652,6 +673,7 @@ def main():
         upload_type = st.radio(
             "🔍 Type d'image :",
             ["🏥 DICOM (.dcm)", "📸 Standard (JPG/PNG)"],
+            index=1,  # ← ici on force le choix par défaut
             horizontal=True,
             help="Sélectionnez le format de votre image médicale"
         )
@@ -659,11 +681,45 @@ def main():
         # Zone d'upload stylisée
         file_types = ["dcm"] if "DICOM" in upload_type else ["jpg", "jpeg", "png"]
         
+        # Initialiser le chemin sélectionné dans session_state si absent
+        # Initialisation session_state si nécessaire
+        if "selected_image_path" not in st.session_state:
+            st.session_state.selected_image_path = None
+
+        # --- Affichage des exemples préchargés ---
+        st.markdown("### 📂 Exemples d’Images Préchargées")
+        col_sain, col_malade = st.columns(2)
+
+        with col_sain:
+            st.image("sain.jpeg", caption="🟢 Image de patient sain", use_container_width=True)
+            if st.button("🖼️ Utiliser l’image saine"):
+                st.session_state.selected_image_path = "sain.jpeg"
+            st.download_button("📥 Télécharger", data=open("sain.jpeg", "rb"), file_name="image_saine.jpg", mime="image/jpeg")
+
+        with col_malade:
+            st.image("malade.jpeg", caption="🔴 Image de patient malade", use_container_width=True)
+            if st.button("🖼️ Utiliser l’image malade"):
+                st.session_state.selected_image_path = "malade.jpeg"
+            st.download_button("📥 Télécharger", data=open("malade.jpeg", "rb"), file_name="image_malade.jpg", mime="image/jpeg")
+
+        # --- Uploader toujours visible ---
         uploaded_file = st.file_uploader(
-            "Glissez-déposez votre fichier ici ou cliquez pour parcourir",
+            "📂 Glissez-déposez votre fichier ici ou cliquez pour parcourir",
             type=file_types,
             help=f"Formats acceptés: {', '.join(file_types).upper()}"
         )
+
+        # --- Si une image par défaut a été choisie, on la lit comme un fichier uploadé ---
+        if st.session_state.selected_image_path:
+            with open(st.session_state.selected_image_path, "rb") as f:
+                uploaded_file = BytesIO(f.read())
+                uploaded_file.name = st.session_state.selected_image_path  # nécessaire pour imiter l’uploader
+        else:
+            uploaded_file = st.file_uploader(
+                "Glissez-déposez votre fichier ici ou cliquez pour parcourir",
+                type=file_types,
+                help=f"Formats acceptés: {', '.join(file_types).upper()}"
+            )
         
         if not uploaded_file:
             st.markdown("""
@@ -835,12 +891,12 @@ def main():
         
         with st.expander("📄 Voir le rapport complet", expanded=True):
             st.markdown(f"""
-            <div class="glass-card">
-                <div style="font-size: 1rem; line-height: 1.8; color: #444;">
-                    {report_text.replace('**', '<strong>').replace('**', '</strong>')}
+                <div class="glass-card">
+                    <div style="font-size: 1rem; line-height: 1.8; color: #e0e0e0;">
+                        {report_text.replace('**', '<strong>').replace('**', '</strong>')}
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
         
         # Section de téléchargement
         st.markdown("---")
