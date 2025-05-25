@@ -703,11 +703,6 @@ def main():
             st.download_button("📥 Télécharger", data=open("malade.jpeg", "rb"), file_name="image_malade.jpg", mime="image/jpeg")
 
         # --- Uploader toujours visible ---
-        uploaded_file = st.file_uploader(
-            "📂 Glissez-déposez votre fichier ici ou cliquez pour parcourir",
-            type=file_types,
-            help=f"Formats acceptés: {', '.join(file_types).upper()}"
-        )
 
         # --- Si une image par défaut a été choisie, on la lit comme un fichier uploadé ---
         if st.session_state.selected_image_path:
