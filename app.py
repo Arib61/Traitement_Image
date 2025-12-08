@@ -1,148 +1,200 @@
 import streamlit as st
 from io import BytesIO
 
-# Import des modules locaux
-from src.config import setup_page
+# Imports
+from src.config import (
+    setup_page, 
+    STATUS_IDLE, 
+    STATUS_PROCESSING_IMAGE, 
+    STATUS_MODEL_PREDICTING, 
+    STATUS_REPORT_GENERATING, 
+    STATUS_COMPLETE
+)
 from src.model_logic import PneumoniaModel
 from src import image_utils, report_utils, ui_components
 
-# 1. Configuration initiale
+# Setup Page Configuration
 setup_page()
 
+# ==================== SESSION STATE INITIALIZATION ====================
+if "app_status" not in st.session_state:
+    st.session_state.app_status = STATUS_IDLE
+if "processed_img" not in st.session_state:
+    st.session_state.processed_img = None
+if "probability" not in st.session_state:
+    st.session_state.probability = 0.0
+if "report_text" not in st.session_state:
+    st.session_state.report_text = ""
+if "pdf_data" not in st.session_state:
+    st.session_state.pdf_data = None
+if "heatmap_enabled" not in st.session_state:
+    st.session_state.heatmap_enabled = False
+if "uploaded_file" not in st.session_state:
+    st.session_state.uploaded_file = None
+
+# ==================== HELPER FUNCTIONS ====================
+def handle_example(fname):
+    """Load example X-ray images"""
+    try:
+        with open(fname, "rb") as f:
+            f_bytes = BytesIO(f.read())
+            f_bytes.name = fname
+            return f_bytes
+    except FileNotFoundError:
+        st.error(f"Example file not found: {fname}")
+        return None
+
+def reset_analysis():
+    """Reset the analysis state"""
+    st.session_state.app_status = STATUS_IDLE
+    st.session_state.processed_img = None
+    st.session_state.probability = 0.0
+    st.session_state.report_text = ""
+    st.session_state.pdf_data = None
+    st.session_state.heatmap_enabled = False
+    st.session_state.uploaded_file = None
+
+# ==================== MAIN APPLICATION ====================
 def main():
-    # 2. Affichage UI
-    ui_components.render_hero()
-    confidence_threshold = ui_components.render_sidebar()
-
-    # 3. Chargement du modèle
+    # Render Header
+    ui_components.render_header()
+    
+    # Initialize Model Handler
     model_handler = PneumoniaModel()
-    if not model_handler.model:
-        return
-
-    # 4. Interface principale
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.markdown("""
-        <div class="glass-card">
-            <h3 style="color: #667eea; text-align: center; margin-bottom: 2rem;">📁 Upload d'Image</h3>
-        </div>
-        """, unsafe_allow_html=True)
+    
+    # ==================== MAIN LAYOUT (3-COLUMN GRID) ====================
+    # Create three columns for the clinical interface
+    col_left, col_center, col_right = st.columns([1, 1.5, 1], gap="small")
+    
+    # ==================== LEFT PANEL: Upload & Patient Info ====================
+    with col_left:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
         
-        upload_type = st.radio(
-            "🔍 Type d'image :",
-            ["🏥 DICOM (.dcm)", "📸 Standard (JPG/PNG)"],
-            index=1,
-            horizontal=True
+        uploaded_file, btn_sain, btn_malade = ui_components.render_left_panel(
+            st.session_state.app_status
         )
         
-        # Gestion des exemples préchargés
-        if "selected_image_path" not in st.session_state:
-            st.session_state.selected_image_path = None
-
-        st.markdown("### 📂 Exemples")
-        col_ex1, col_ex2 = st.columns(2)
-        with col_ex1:
-            if st.button("🖼️ Charger Sain"):
-                st.session_state.selected_image_path = "sain.jpeg"
-        with col_ex2:
-            if st.button("🖼️ Charger Malade"):
-                st.session_state.selected_image_path = "malade.jpeg"
-
-        # Gestion fichier
-        uploaded_file = None
-        if st.session_state.selected_image_path:
-            try:
-                with open(st.session_state.selected_image_path, "rb") as f:
-                    uploaded_file = BytesIO(f.read())
-                    uploaded_file.name = st.session_state.selected_image_path
-                    st.info(f"Image chargée : {st.session_state.selected_image_path}")
-            except FileNotFoundError:
-                st.error("Image d'exemple introuvable. Veuillez uploader un fichier.")
-
-        if not uploaded_file:
-            uploaded_file = st.file_uploader(
-                "Glissez-déposez votre fichier ici",
-                type=["dcm", "jpg", "jpeg", "png"]
-            )
+        # Handle file input sources
+        file_to_process = None
+        
+        if btn_sain:
+            file_to_process = handle_example("sain.jpeg")
+        elif btn_malade:
+            file_to_process = handle_example("malade.jpeg")
+        elif uploaded_file:
+            file_to_process = uploaded_file
+        
+        # Trigger processing
+        if file_to_process and st.session_state.app_status in [STATUS_IDLE, STATUS_COMPLETE]:
+            st.session_state.uploaded_file = file_to_process
+            st.session_state.app_status = STATUS_PROCESSING_IMAGE
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    with col2:
-        if uploaded_file:
-            st.markdown("""
-            <div class="glass-card">
-                <h3 style="color: #667eea; text-align: center;">🔬 Analyse en Cours</h3>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # A. Traitement
-            with st.spinner("Traitement de l'image..."):
-                if "DICOM" in upload_type:
-                    processed_img = image_utils.process_dicom(uploaded_file)
-                else:
-                    processed_img = image_utils.process_standard(uploaded_file)
-            
-            if processed_img:
-                st.image(processed_img, caption="Image Analysée", use_container_width=True)
-
-                # B. Prédiction
-                img_np = image_utils.prepare_for_model(processed_img)
-                probability = model_handler.predict(img_np)
-
-                if probability is not None:
-                    display_results(probability, processed_img)
-
-def display_results(probability, image):
-    st.divider()
+    # ==================== STATE MACHINE: Processing Pipeline ====================
     
-    # Indicateurs Visuels
-    c1, c2, c3 = st.columns([1, 1, 1])
-    
-    with c1:
-        st.markdown(f"""
-        <div class="glass-card" style="text-align: center;">
-            <h3 style="color: #667eea;">🎯 Probabilité</h3>
-            <div class="probability-display">{probability*100:.1f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with c2:
-        st.plotly_chart(report_utils.create_chart(probability), use_container_width=True)
-    
-    with c3:
-        status = "RISQUE ÉLEVÉ" if probability > 0.7 else "RISQUE MODÉRÉ" if probability > 0.3 else "RISQUE FAIBLE"
-        color = "status-high" if probability > 0.7 else "status-low"
-        st.markdown(f"""
-        <div class="glass-card" style="text-align: center; display: flex; align-items: center; justify-content: center; height: 100%;">
-            <div class="status-badge {color}">{status}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Section Rapport IA & PDF
-    api_key = st.secrets.get("GEMINI_API_KEY", "")
-    
-    if api_key:
-        st.markdown("### 📋 Rapport Médical & PDF")
-        with st.expander("📝 Lire le rapport généré par l'IA", expanded=True):
-            with st.spinner("Génération du rapport et du PDF..."):
-                # 1. Générer le texte
-                report_text = report_utils.get_gemini_response(probability, api_key)
-                st.markdown(report_text)
+    # State 1: Image Processing
+    if st.session_state.app_status == STATUS_PROCESSING_IMAGE:
+        try:
+            if st.session_state.uploaded_file:
+                filename = st.session_state.uploaded_file.name.lower()
                 
-                # 2. Générer le PDF
-                pdf_data = report_utils.create_pdf(probability, report_text, image)
-                
-                if pdf_data:
-                    st.download_button(
-                        label="📥 Télécharger le Rapport PDF Officiel",
-                        data=pdf_data,
-                        file_name=f"PneumoScan_Rapport.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
+                if "dcm" in filename or filename.endswith(".dcm"):
+                    st.session_state.processed_img = image_utils.process_dicom(
+                        st.session_state.uploaded_file
                     )
                 else:
-                    st.error("Erreur génération PDF.")
-    else:
-        st.warning("⚠️ Clé API Gemini manquante dans .streamlit/secrets.toml")
+                    st.session_state.processed_img = image_utils.process_standard(
+                        st.session_state.uploaded_file
+                    )
+                
+                st.session_state.app_status = STATUS_MODEL_PREDICTING
+                st.rerun()
+        except Exception as e:
+            st.error(f"Image processing error: {str(e)}")
+            reset_analysis()
+    
+    # State 2: Model Prediction
+    elif st.session_state.app_status == STATUS_MODEL_PREDICTING:
+        try:
+            if st.session_state.processed_img is not None:
+                img_np = image_utils.prepare_for_model(st.session_state.processed_img)
+                st.session_state.probability = model_handler.predict(img_np)
+                st.session_state.app_status = STATUS_REPORT_GENERATING
+                st.rerun()
+        except Exception as e:
+            st.error(f"Model prediction error: {str(e)}")
+            reset_analysis()
+    
+    # State 3: Report Generation
+    elif st.session_state.app_status == STATUS_REPORT_GENERATING:
+        try:
+            # Get Gemini API key from secrets
+            api_key = st.secrets.get("GEMINI_API_KEY", "")
+            
+            # Generate AI report
+            st.session_state.report_text = report_utils.get_gemini_response(
+                st.session_state.probability, 
+                api_key
+            )
+            
+            # Generate PDF
+            st.session_state.pdf_data = report_utils.create_pdf(
+                st.session_state.probability,
+                st.session_state.report_text,
+                st.session_state.processed_img
+            )
+            
+            st.session_state.app_status = STATUS_COMPLETE
+            st.rerun()
+        except Exception as e:
+            st.error(f"Report generation error: {str(e)}")
+            # Still show results even if report generation fails
+            st.session_state.report_text = "Report generation encountered an error. Please check API configuration."
+            st.session_state.app_status = STATUS_COMPLETE
+            st.rerun()
+    
+    # ==================== CENTER PANEL: Image Display ====================
+    with col_center:
+        st.markdown('<div class="panel panel-center">', unsafe_allow_html=True)
+        
+        # Sync heatmap toggle state
+        if "heatmap_toggle" in st.session_state:
+            st.session_state.heatmap_enabled = st.session_state.heatmap_toggle
+        
+        ui_components.render_center_panel(
+            st.session_state.app_status,
+            st.session_state.processed_img,
+            st.session_state.heatmap_enabled
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # ==================== RIGHT PANEL: Results & Report ====================
+    with col_right:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        
+        ui_components.render_right_panel(
+            st.session_state.app_status,
+            st.session_state.probability,
+            st.session_state.report_text,
+            st.session_state.pdf_data
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # ==================== FOOTER: Additional Actions ====================
+    # Add a subtle footer with reset option
+    if st.session_state.app_status == STATUS_COMPLETE:
+        st.markdown("---")
+        col_footer1, col_footer2, col_footer3 = st.columns([1, 1, 1])
+        
+        with col_footer2:
+            if st.button("🔄 New Analysis", use_container_width=True, type="secondary"):
+                reset_analysis()
+                st.rerun()
 
+# ==================== APPLICATION ENTRY POINT ====================
 if __name__ == "__main__":
     main()
