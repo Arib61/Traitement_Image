@@ -1,0 +1,14 @@
+# Ignorer l'environnement virtuel (Tes 10k fichiers sont ici)
+env/
+venv/
+.env
+
+# Ignorer les fichiers cache de Python
+__pycache__/
+*.pyc
+
+# TRES IMPORTANT : Ignorer tes clés secrètes
+.streamlit/secrets.toml
+
+# Fichiers système inutiles
+.DS_Store
